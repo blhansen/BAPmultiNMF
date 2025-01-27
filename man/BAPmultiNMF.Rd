@@ -6,7 +6,7 @@
 \usage{
 BAPmultiNMF(
   M_s,
-  x_s,
+  x_s = NULL,
   R = 5,
   hyperparameters = NULL,
   P_recover = NULL,
@@ -20,7 +20,7 @@ BAPmultiNMF(
 \arguments{
 \item{M_s}{A list of length \eqn{S}, containing counts matrices of dimensions \eqn{K \times N_s}.}
 
-\item{x_s}{A list of length \eqn{S}, containing covariate matrices of dimensions \eqn{N_s \times D_s}, where \eqn{D_s} is the number of covariates in study s.}
+\item{x_s}{A list of length \eqn{S}, containing covariate matrices of dimensions \eqn{N_s \times D_s}, where \eqn{D_s} is the number of covariates in study s. If no covariates are provided, an intercept will be used for each study.}
 
 \item{R}{The number of discovered signatures. Default is 5.}
 
@@ -65,6 +65,21 @@ A list  containing the the relevant parameters of the mean-field approximation. 
 The function implements the CAVI algorithm described in Hansen et al. (2025+)
 The code will return the relevant parameters of the mean-field
 approximation described in the main paper.
+}
+\examples{
+# Generate Data
+S <- 3
+R <- 5
+K <- 20
+N_s <- c(50, 60, 70)
+
+P <- rdirichlet(R, rep(1/K, K))
+E_s <- lapply(1:S, function(s){t(rdirichlet(N_s[s], rgamma(K, shape = 1, rate=0.5)))})
+M_s <- lapply(1:S, function(s) matrix(rpois(N_s[s]*K, 500*(P \%*\% E_s[[s]])), nrow=K, ncol=N_s[s]))
+
+# Run CAVI
+BAPmultiNMF(M_s=M_s, R=5)
+
 }
 \references{
 Hansen, B., Grabski, I. N., Parmigiani, G.,  De Vito, R. (2025+).

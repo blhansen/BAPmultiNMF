@@ -6,7 +6,7 @@
 #' approximation described in the main paper.
 #'
 #' @param M_s A list of length \eqn{S}, containing counts matrices of dimensions \eqn{K \times N_s}.
-#' @param x_s A list of length \eqn{S}, containing covariate matrices of dimensions \eqn{N_s \times D_s}, where \eqn{D_s} is the number of covariates in study s.
+#' @param x_s A list of length \eqn{S}, containing covariate matrices of dimensions \eqn{N_s \times D_s}, where \eqn{D_s} is the number of covariates in study s. If no covariates are provided, an intercept will be used for each study.
 #' @param R The number of discovered signatures. Default is 5.
 #' @param hyperparameters A list containing hyperparameter values. The components are:
 #' \describe{
@@ -44,8 +44,22 @@
 #' @references Hansen, B., Grabski, I. N., Parmigiani, G.,  De Vito, R. (2025+).
 #' Bayesian Probit Multi-Study Non-negative Matrix Factorization for Mutational Signatures.
 #' Submitted manuscript.
+#' @examples
+#' # Generate Data
+#' S <- 3
+#' R <- 5
+#' K <- 20
+#' N_s <- c(50, 60, 70)
+#'
+#' P <- rdirichlet(R, rep(1/K, K))
+#' E_s <- lapply(1:S, function(s){t(rdirichlet(N_s[s], rgamma(K, shape = 1, rate=0.5)))})
+#' M_s <- lapply(1:S, function(s) matrix(rpois(N_s[s]*K, 500*(P %*% E_s[[s]])), nrow=K, ncol=N_s[s]))
+#'
+#' # Run CAVI
+#' BAPmultiNMF(M_s=M_s, R=5)
+#'
 BAPmultiNMF <- function(M_s,
-                        x_s,
+                        x_s = NULL,
                         R = 5,
                         hyperparameters = NULL,
                         P_recover = NULL,
@@ -71,6 +85,8 @@ BAPmultiNMF <- function(M_s,
   }
   N_s <- sapply(M_s, function(x)
     dim(x)[2])
+
+  if(is.null(x_s)){x_s=lapply(1:length(M_s), function(s) matrix(1, nrow=ncol(M_s[[s]]), ncol=1))}
 
   # Check for specified priors, otherwise use default values
   default_hyperparameters <- list(
