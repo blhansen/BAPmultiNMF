@@ -15,11 +15,17 @@ E_s <- lapply(1:S, function(s){t(rdirichlet(N_s[s], rgamma(K, shape = 1, rate=0.
 M_s <- lapply(1:S, function(s) matrix(rpois(N_s[s]*K, 500*(P %*% E_s[[s]])), nrow=K, ncol=N_s[s]))
 
 # Run CAVI
-BAPmultiNMF(M_s=M_s, R=5)
+approx_1 <- BAPmultiNMF(M_s=M_s, R=5)
 
 ## Recovery Discovery Version
 
 Simply provide signatures to recover as an argument:
 
-BAPmultiNMF(M_s=M_s, R=5, P_recover = P)
+approx_2 <- BAPmultiNMF(M_s=M_s, R=5, P_recover = P)
+
+## Accessing Signatures
+
+The variational dirichlet concentrations will be returned, so we should normalize the columns of P before examining them:
+
+P_estimate <- approx_1$p_conc %*% diag(1/colSums(approx_1$p_conc))
 
