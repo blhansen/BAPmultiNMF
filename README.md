@@ -1,12 +1,12 @@
-# BAPmultiNMF
+# BAPmultiNMF Package
 
 author: Blake Hansen
 
 Methods to estimate BAP Multi-NMF via Coordinate Ascent Variational Inference.
 
 ## Discovery Only Version
-# Generate some data
 ```{r example_1, echo = TRUE, results = TRUE, tidy = TRUE}
+# Generate some data
 S <- 3
 R <- 5
 K <- 20
