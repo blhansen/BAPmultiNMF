@@ -34,7 +34,6 @@
 #' \item{\code{W_s}}{A list of length S, where each entry is a list of length N_s, containing the total mutation counts.}
 #' \item{\code{priors}}{The list of hyperparameter values used.}
 #' @importFrom LaplacesDemon rdirichlet
-#' @importFrom cubature hcubature
 #' @import NMF
 #' @export
 #' @references Hansen, B., Grabski, I. N., Parmigiani, G.,  De Vito, R. (2025+).

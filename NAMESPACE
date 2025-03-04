@@ -3,4 +3,3 @@
 export(BAPmultiNMF)
 import(NMF)
 importFrom(LaplacesDemon,rdirichlet)
-importFrom(cubature,hcubature)
