@@ -2,7 +2,7 @@
 
 author: Blake Hansen
 
-Methods to estimate BAP Multi-NMF via Coordinate Ascent Variational Inference.
+Methods to estimate [BAP Multi-NMF](https://doi.org/10.48550/arXiv.2502.01468) via Coordinate Ascent Variational Inference.
 
 ## Installation
 
