@@ -26,11 +26,11 @@ BAPmultiNMF(
 
 \item{hyperparameters}{A list containing hyperparameter values. The components are:
 \describe{
-\item{alpha_p}{Dirichlet concentration parameter of dimension K for p(P_r). Default is 1/K.}
+\item{alpha_p}{Dirichlet concentration parameter of dimension K for p(P_r). Default is 1.}
 \item{e_conc}{Dirichlet concentration value for exposures when a=1. Default is 5.}
 \item{e_conc_null}{Dirichlet concentration value for exposures when a=0. Default is 1.}
-\item{tau_s_shape}{Gamma shape parameter for p(tau_s). Default is 10.}
-\item{taue_s_rate}{Gamma rate parameter for p(tau_s). Default is 1.}
+\item{tau_s_shape}{Gamma shape parameter for p(tau_s). Default is 0.1.}
+\item{taue_s_rate}{Gamma rate parameter for p(tau_s). Default is 0.1.}
 \item{beta_prior}{Prior mean of beta_s for the intercept term. Default corresponds to 0.1 baseline probability.}
 }}
 
