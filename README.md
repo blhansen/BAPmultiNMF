@@ -5,8 +5,10 @@ author: Blake Hansen
 Methods to estimate BAP Multi-NMF via Coordinate Ascent Variational Inference.
 
 ## Installation
+
+BAPmultiNMF can be installed using the `devtools` package:
+
 ```{r example_install, echo = TRUE, results = TRUE, tidy = TRUE}
-# Install BAPmultiNMF
 library(devtools)
 install_github("blhansen/BAPmultiNMF")
 
