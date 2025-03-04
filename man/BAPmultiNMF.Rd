@@ -26,9 +26,6 @@ BAPmultiNMF(
 
 \item{hyperparameters}{A list containing hyperparameter values. The components are:
 \describe{
-\item{lambda_w}{Exponential rate parameter for p(alpha_w). Default is 1.}
-\item{a_w}{Gamma shape parameter for p(beta_w). Default is 1.}
-\item{b_w}{Gamma rate parameter for p(beta_w). Default is 10.}
 \item{alpha_p}{Dirichlet concentration parameter of dimension K for p(P_r). Default is 1/K.}
 \item{e_conc}{Dirichlet concentration value for exposures when a=1. Default is 5.}
 \item{e_conc_null}{Dirichlet concentration value for exposures when a=0. Default is 1.}
@@ -57,8 +54,7 @@ A list  containing the the relevant parameters of the mean-field approximation. 
 \item{\code{a_star_mean}}{A list of length S, where each entry is a matrix of dimension \eqn{R \times N_s}, containing the variational posterior means for a_star.}
 \item{\code{mean_beta}}{A list of length S, where each entry is a list of length R, containing the variational mean for beta_s.}
 \item{\code{var_beta}}{A list of length S, where each entry is a list of length R, containing the variational variance for beta_s.}
-\item{\code{w_shape}}{A list of length S, where each entry is the shape parameter for the posterior distribution of w_sj.}
-\item{\code{w_rate}}{A list of length S, where each entry is the rate parameter for the posterior distribution of w_sj.}
+\item{\code{W_s}}{A list of length S, where each entry is a list of length N_s, containing the total mutation counts.}
 \item{\code{priors}}{The list of hyperparameter values used.}
 }
 \description{

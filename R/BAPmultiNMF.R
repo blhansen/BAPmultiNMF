@@ -10,9 +10,6 @@
 #' @param R The number of discovered signatures. Default is 5.
 #' @param hyperparameters A list containing hyperparameter values. The components are:
 #' \describe{
-#' \item{lambda_w}{Exponential rate parameter for p(alpha_w). Default is 1.}
-#' \item{a_w}{Gamma shape parameter for p(beta_w). Default is 1.}
-#' \item{b_w}{Gamma rate parameter for p(beta_w). Default is 10.}
 #' \item{alpha_p}{Dirichlet concentration parameter of dimension K for p(P_r). Default is 1/K.}
 #' \item{e_conc}{Dirichlet concentration value for exposures when a=1. Default is 5.}
 #' \item{e_conc_null}{Dirichlet concentration value for exposures when a=0. Default is 1.}
@@ -34,8 +31,7 @@
 #' \item{\code{a_star_mean}}{A list of length S, where each entry is a matrix of dimension \eqn{R \times N_s}, containing the variational posterior means for a_star.}
 #' \item{\code{mean_beta}}{A list of length S, where each entry is a list of length R, containing the variational mean for beta_s.}
 #' \item{\code{var_beta}}{A list of length S, where each entry is a list of length R, containing the variational variance for beta_s.}
-#' \item{\code{w_shape}}{A list of length S, where each entry is the shape parameter for the posterior distribution of w_sj.}
-#' \item{\code{w_rate}}{A list of length S, where each entry is the rate parameter for the posterior distribution of w_sj.}
+#' \item{\code{W_s}}{A list of length S, where each entry is a list of length N_s, containing the total mutation counts.}
 #' \item{\code{priors}}{The list of hyperparameter values used.}
 #' @importFrom LaplacesDemon rdirichlet
 #' @importFrom cubature hcubature
@@ -70,6 +66,8 @@ BAPmultiNMF <- function(M_s,
                         verbose = TRUE) {
   S <- length(M_s)
 
+  W_s <- lapply(M_s, colSums)
+
   # log likelihood of poisson
   log_like_poisson <- function(theta, x) {
     -theta + x * log(theta + 1e-7) - lgamma(x + 1)
@@ -90,9 +88,6 @@ BAPmultiNMF <- function(M_s,
 
   # Check for specified priors, otherwise use default values
   default_hyperparameters <- list(
-    "lambda_w" = 1,
-    "a_w" = 1,
-    "b_w" = 10,
     "alpha_p" = rep(1 / K, K),
     "e_conc" = 5,
     "e_conc_null" = 1,
@@ -192,47 +187,6 @@ BAPmultiNMF <- function(M_s,
         hyperparameters$e_conc, R
       ))))
   }
-
-  # Calculate parameters for W
-  w_shape <- lapply(1:S, function(s)
-    1 / hyperparameters$lambda_w + colSums(M_s[[s]]))
-  w_rate <- lapply(1:S, function(s)
-    hyperparameters$a_w / hyperparameters$b_w + 1)
-
-  b_w_shape <- lapply(1:S, function(s)
-    N_s[s] / hyperparameters$lambda_w + hyperparameters$a_w)
-  b_w_rate <- lapply(1:S, function(s)
-    sum(w_shape[[s]] / w_rate[[s]]) + hyperparameters$b_w)
-
-  # initial version
-  a_w_expect <- lapply(1:S, function(s) {
-    a_w_density <- function(alpha) {
-      log(hyperparameters$lambda_w) - hyperparameters$lambda_w * alpha +
-        sum(sapply(1:N_s[s], function(j) {
-          dgamma(
-            w_shape[[s]][j] / w_rate[[s]],
-            shape = alpha,
-            rate = b_w_shape[[s]] / b_w_rate[[s]],
-            log = TRUE
-          )
-        }))
-    }
-    offset <- optimise(a_w_density,
-                       interval = c(0, 1e7),
-                       maximum = TRUE)$objective
-    constant <- hcubature(
-      function(x)
-        exp(a_w_density(x) - offset),
-      lowerLimit = 0,
-      upperLimit = Inf
-    )$integral
-    hcubature(
-      function(x)
-        exp(log(x) + a_w_density(x) - offset - log(constant)),
-      lowerLimit = 0,
-      upperLimit = Inf
-    )$integral
-  })
 
   # Initialize latent sig counts
   z_prob <- lapply(1:S, function(s) {
@@ -405,7 +359,7 @@ BAPmultiNMF <- function(M_s,
   # Calculate initial likelihood
   M_s_hat <-
     lapply(1:S, function(s)
-      (p_mean %*% e_mean[[s]]) %*% diag(w_shape[[s]] / w_rate[[s]]))
+      (p_mean %*% e_mean[[s]]) %*% diag(W_s[[s]]))
   loglike <-
     sum(mapply(log_like_poisson, unlist(M_s_hat), unlist(M_s)))
 
@@ -417,46 +371,6 @@ BAPmultiNMF <- function(M_s,
     iter <- iter + 1
     if (iter > max_iter)
       break
-
-    # Calculate parameters for W
-    if (iter <= 5) {
-      w_shape <- lapply(1:S, function(s)
-        a_w_expect[[s]] + colSums(M_s[[s]]))
-      w_rate <- lapply(1:S, function(s)
-        b_w_shape[[s]] / b_w_rate[[s]] + 1)
-
-      b_w_shape <- lapply(1:S, function(s)
-        N_s[s] * a_w_expect[[s]] + hyperparameters$a_w)
-      b_w_rate <- lapply(1:S, function(s)
-        sum(w_shape[[s]] / w_rate[[s]]) + hyperparameters$b_w)
-
-      a_w_expect <- lapply(1:S, function(s) {
-        a_w_density <- function(alpha) {
-          log(hyperparameters$lambda_w) - hyperparameters$lambda_w * alpha +
-            sum(sapply(1:N_s[s], function(j) {
-              alpha * (digamma(b_w_shape[[s]]) - log(b_w_rate[[s]])) -  lgamma(alpha) + (alpha - 1) * (digamma(w_shape[[s]][j]) - log(w_rate[[s]])) - (w_shape[[s]][j] /
-                                                                                                                                                         w_rate[[s]]) * (b_w_shape[[s]] / b_w_rate[[s]])
-            }))
-        }
-        offset <- optimise(a_w_density,
-                           interval = c(0, 1e7),
-                           maximum = TRUE)$objective
-        constant <- hcubature(
-          function(x)
-            exp(a_w_density(x) - offset),
-          lowerLimit = 0,
-          upperLimit = Inf,
-          tol = 1e-4
-        )$integral
-        hcubature(
-          function(x)
-            exp(log(x) - log(constant) + a_w_density(x) - offset),
-          lowerLimit = 0,
-          upperLimit = Inf,
-          tol = 1e-4
-        )$integral
-      })
-    }
 
     z_prob <- lapply(1:S, function(s) {
       array(sapply(1:N_s[s], function(j) {
@@ -614,7 +528,7 @@ BAPmultiNMF <- function(M_s,
 
     M_s_hat <-
       lapply(1:S, function(s)
-        (p_mean %*% e_mean[[s]]) %*% diag(w_shape[[s]] / w_rate[[s]]))
+        (p_mean %*% e_mean[[s]]) %*% diag(W_s[[s]]))
     loglike_new <-
       sum(mapply(log_like_poisson, unlist(M_s_hat), unlist(M_s)))
 
@@ -635,8 +549,7 @@ BAPmultiNMF <- function(M_s,
     "a_star" = a_star,
     "mean_beta" = mean_beta_s,
     "var_beta" = var_beta_s,
-    "w_shape" = w_shape,
-    "w_rate" = w_rate,
+    "W_s" = W_s,
     "priors" = hyperparameters
   )
   return(ests)
