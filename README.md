@@ -4,6 +4,15 @@ author: Blake Hansen
 
 Methods to estimate BAP Multi-NMF via Coordinate Ascent Variational Inference.
 
+## Installation
+
+```{r example_install, echo = TRUE, results = TRUE, tidy = TRUE}
+# Install BAPmultiNMF
+library(devtools)
+devtools::install_github("blhansen/BAPmultiNMF")
+library(BAPmultiNMF)
+```
+
 ## Discovery Only Version
 ```{r example_1, echo = TRUE, results = TRUE, tidy = TRUE}
 # Generate some data
@@ -14,7 +23,6 @@ N_s <- c(50, 60, 70)
 P <- rdirichlet(R, rep(1/K, K))
 E_s <- lapply(1:S, function(s){t(rdirichlet(N_s[s], rgamma(K, shape = 1, rate=0.5)))})
 M_s <- lapply(1:S, function(s) matrix(rpois(N_s[s]*K, 500*(P %*% E_s[[s]])), nrow=K, ncol=N_s[s]))
-
 
 # Run CAVI
 approx_1 <- BAPmultiNMF(M_s=M_s, R=5)
