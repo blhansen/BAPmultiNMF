@@ -135,7 +135,7 @@ BAPmultiNMF <- function(M_s,
 
     R_selected <- ncol(P_initial)
     if (verbose == TRUE) {
-      print(paste(R_selected, "signatures initialized via NMF"))
+      print(paste(R_selected, "signatures initialized via NMF,", R - R_selected, "signatures initialized with random values."))
     }
 
     nmf_initial = nmf(data_stacked, R_selected)
