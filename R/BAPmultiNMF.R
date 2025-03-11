@@ -19,7 +19,7 @@
 #' }
 #' @param P_recover A matrix of dimensions \eqn{K \times R_{recover}}, containing previously known signatures to be recovered.
 #' @param recover_weights Either a single value or list of values of length \eqn{R_{recover}}, controlling the strength of the recovery prior. Higher values correspond to a more informative prior.
-#' @param tol Convergence criteria. Default is 1e-6.
+#' @param tol Convergence criteria. Default is 1e-5.
 #' @param min_iter Minimum number of CAVI iterations. Default is 10.
 #' @param max_iter Maximum number of CAVI iterations. Default is 1000.
 #' @param verbose Logical value determining if the convergence criteria should be printed at each iteration. Default is TRUE.
@@ -59,7 +59,7 @@ BAPmultiNMF <- function(M_s,
                         hyperparameters = NULL,
                         P_recover = NULL,
                         recover_weights = 1e8,
-                        tol = 1e-6,
+                        tol = 1e-5,
                         min_iter = 10,
                         max_iter = 1e4,
                         verbose = TRUE) {
@@ -105,7 +105,7 @@ BAPmultiNMF <- function(M_s,
     cosineDist <- function(x, y) {
       (x %*% t(y)) / (sqrt(rowSums(x^2) %*% t(rowSums(y^2))))
     }
-    cos_threshold <- 0.5
+    cos_threshold <- 0.6
     data_stacked <- do.call(cbind, M_s)
 
     R_initial <- R_selected <- R
@@ -374,17 +374,8 @@ BAPmultiNMF <- function(M_s,
     z_prob <- lapply(1:S, function(s) {
       array(sapply(1:N_s[s], function(j) {
         sapply(1:K, function(i) {
-          mean_e <- e_mean[[s]][, j] + 1e-10
-          mean_p <- p_mean[i, ] + 1e-10
-
-          var_e <- mean_e * (1 - mean_e) / (sum(e_conc[[s]][, j]) + 1)
-          var_p <- mean_p * (1 - mean_p) / (sum(p_conc[i, ]) + 1)
-
-          probs <- exp(
-            log(mean_e * mean_p) + 1 / 2 * (mean_e^2 * var_p + var_p * var_e  + var_e * mean_p^2) * (-1 /
-                                                                                                       2 / (mean_e * mean_p)^2)
-          )
-
+          probs <- sapply(1:R, function(r) digamma(p_conc[i,r])-digamma(sum(p_conc[,r]))+digamma(e_conc[[s]][r,j])-digamma(sum(e_conc[[s]][,j])))
+          probs <- exp(probs)
           probs <- probs / sum(probs)
           return(as.array(probs))
         })

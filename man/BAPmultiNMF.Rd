@@ -11,7 +11,7 @@ BAPmultiNMF(
   hyperparameters = NULL,
   P_recover = NULL,
   recover_weights = 1e+08,
-  tol = 1e-06,
+  tol = 1e-05,
   min_iter = 10,
   max_iter = 10000,
   verbose = TRUE
@@ -38,7 +38,7 @@ BAPmultiNMF(
 
 \item{recover_weights}{Either a single value or list of values of length \eqn{R_{recover}}, controlling the strength of the recovery prior. Higher values correspond to a more informative prior.}
 
-\item{tol}{Convergence criteria. Default is 1e-6.}
+\item{tol}{Convergence criteria. Default is 1e-5.}
 
 \item{min_iter}{Minimum number of CAVI iterations. Default is 10.}
 
