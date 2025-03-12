@@ -64,13 +64,7 @@ BAPmultiNMF <- function(M_s,
                         max_iter = 1e4,
                         verbose = TRUE) {
   S <- length(M_s)
-
   W_s <- lapply(M_s, colSums)
-
-  # log likelihood of poisson
-  log_like_poisson <- function(theta, x) {
-    -theta + x * log(theta + 1e-7) - lgamma(x + 1)
-  }
 
   # Dimensions of Data
   if (length(unique(sapply(M_s, function(x)
@@ -172,7 +166,7 @@ BAPmultiNMF <- function(M_s,
     if (length(recover_weights) == 1) {
       recover_weights = rep(recover_weights, ncol(P_recover))
     }
-    P_prior <- cbind(P_recover %*% diag(recover_weights),
+    P_prior <- cbind((P_recover %*% diag(recover_weights))+1e-10,
                      matrix(
                        rep(hyperparameters$alpha_p, R),
                        nrow = K,
@@ -301,25 +295,17 @@ BAPmultiNMF <- function(M_s,
         pos_expect <- mean_xbeta + dnorm(-mean_xbeta) / (1 - pnorm(-mean_xbeta))
         neg_expect <- mean_xbeta - dnorm(-mean_xbeta) / (pnorm(-mean_xbeta))
 
-        if (is.infinite(pos_expect)) {
+        if (is.infinite(pos_expect) | is.nan(pos_expect)) {
           if ((1 - pnorm(-mean_xbeta)) == 0) {
             pos_expect <- 0
           }
         }
-        if (is.infinite(neg_expect)) {
+
+        if (is.infinite(neg_expect) | is.nan(neg_expect)) {
           if ((pnorm(-mean_xbeta)) == 0) {
             neg_expect <- 0
           }
         }
-
-
-        if (is.nan(pos_expect)) {
-          pos_expect <- 0
-        }
-        if (is.nan(neg_expect)) {
-          neg_expect <- 0
-        }
-
 
         inc_probs[[s]][r, j] * pos_expect + (1 - inc_probs[[s]][r, j]) *
           neg_expect
@@ -360,7 +346,7 @@ BAPmultiNMF <- function(M_s,
     lapply(1:S, function(s)
       (p_mean %*% e_mean[[s]]) %*% diag(W_s[[s]]))
   loglike <-
-    sum(mapply(log_like_poisson, unlist(M_s_hat), unlist(M_s)))
+    sum(mapply(function(x,y) dpois(x = x, lambda = y, log = TRUE) ,unlist(M_s),unlist(M_s_hat)))
 
   # Perform iterative CAVI updates
   iter <- 0
@@ -374,7 +360,7 @@ BAPmultiNMF <- function(M_s,
     z_prob <- lapply(1:S, function(s) {
       array(sapply(1:N_s[s], function(j) {
         sapply(1:K, function(i) {
-          probs <- sapply(1:R, function(r) digamma(p_conc[i,r])-digamma(sum(p_conc[,r]))+digamma(e_conc[[s]][r,j])-digamma(sum(e_conc[[s]][,j])))
+          probs <- sapply(1:R, function(r) digamma(p_conc[i,r]+1e-10)-digamma(sum(p_conc[,r]+1e-10))+digamma(e_conc[[s]][r,j]+1e-10)-digamma(sum(e_conc[[s]][,j]+1e-10)))
           probs <- exp(probs)
           probs <- probs / sum(probs)
           return(as.array(probs))
@@ -433,7 +419,6 @@ BAPmultiNMF <- function(M_s,
           var_xbeta <- c(t(x_s[[s]][j, ]) %*% (var_beta_s[[s]][[r]]) %*% x_s[[s]][j, ])
 
           exp_term <- exp(a * mean_xbeta^3 + b * mean_xbeta)
-          #if(is.infinite(exp_term)){exp_term  <- ifelse(sign(mean_xbeta)==1, 0,1e6)}
           probit_1 <- log((1 + exp_term)^-1) - 1 / 2 * var_xbeta * (exp_term * (
             3 * a * mean_xbeta * (2 * exp_term + 3 * a * mean_xbeta^3 + 2) + 6 * a * b * mean_xbeta^2 + b^2
           )) / (exp_term + 1)^2
@@ -464,22 +449,16 @@ BAPmultiNMF <- function(M_s,
           neg_expect <- mean_xbeta - dnorm(-mean_xbeta) / (pnorm(-mean_xbeta) +
                                                              1e-5)
 
-          if (is.infinite(pos_expect)) {
+          if (is.infinite(pos_expect) | is.nan(pos_expect)) {
             if ((1 - pnorm(-mean_xbeta)) == 0) {
               pos_expect <- 0
             }
           }
-          if (is.infinite(neg_expect)) {
+
+          if (is.infinite(neg_expect) | is.nan(neg_expect)) {
             if ((pnorm(-mean_xbeta)) == 0) {
               neg_expect <- 0
             }
-          }
-
-          if (is.nan(pos_expect)) {
-            pos_expect <- 0
-          }
-          if (is.nan(neg_expect)) {
-            neg_expect <- 0
           }
 
           inc_probs[[s]][r, j] * pos_expect + (1 - inc_probs[[s]][r, j]) *
@@ -506,11 +485,11 @@ BAPmultiNMF <- function(M_s,
     mean_beta_s <- lapply(1:S, function(s) {
       lapply(1:R, function(r) {
         var_beta_s[[s]][[r]] %*% (
-          t(x_s[[s]]) %*% a_star[[s]][r, ] + tau_s_shape[[s]] / tau_s_rate[[s]][r] *
-            diag(ncol(x_s[[s]])) %*% matrix(
-              c(hyperparameters$beta_prior, rep(0, ncol(x_s[[s]]) - 1)),
-              nrow = ncol(x_s[[s]]),
-              ncol = 1
+          t(x_s[[s]]) %*% a_star[[s]][r, ] +
+            tau_s_shape[[s]] / tau_s_rate[[s]][r] *
+            diag(ncol(x_s[[s]])) %*% matrix(c(hyperparameters$beta_prior, rep(0, ncol(x_s[[s]]) - 1)),
+                                            nrow = ncol(x_s[[s]]),
+                                            ncol = 1
             )
         )
       })
@@ -520,7 +499,7 @@ BAPmultiNMF <- function(M_s,
       lapply(1:S, function(s)
         (p_mean %*% e_mean[[s]]) %*% diag(W_s[[s]]))
     loglike_new <-
-      sum(mapply(log_like_poisson, unlist(M_s_hat), unlist(M_s)))
+      sum(mapply(function(x,y) dpois(x = x, lambda = y, log = TRUE) ,unlist(M_s),unlist(M_s_hat)))
 
     delta <- abs((loglike - loglike_new) / loglike)
     loglike <- loglike_new
