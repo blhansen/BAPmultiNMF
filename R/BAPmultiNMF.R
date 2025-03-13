@@ -281,6 +281,8 @@ BAPmultiNMF <- function(M_s,
 
         if (is.infinite(log_ratio)) {
           log_ratio <- sign(log_ratio) * 1e3
+        } else if (is.nan(log_ratio)){
+          log_ratio <- sign(-mean_xbeta) * 1e3
         }
         1 / (1 + exp(-log_ratio))
       })
@@ -431,6 +433,8 @@ BAPmultiNMF <- function(M_s,
 
           if (is.infinite(log_ratio)) {
             log_ratio <- sign(log_ratio) * 1e3
+          } else if (is.nan(log_ratio)){
+            log_ratio <- sign(-mean_xbeta) * 1e3
           }
 
 
@@ -472,7 +476,10 @@ BAPmultiNMF <- function(M_s,
     })
     tau_s_rate <- lapply(1:S, function(s) {
       sapply(1:R, function(r) {
-        hyperparameters$tau_s_rate + 1 / 2 * (crossprod(mean_beta_s[[s]][[r]]) + sum(diag(var_beta_s[[s]][[r]])))
+        hyperparameters$tau_s_rate + 1 / 2 * (crossprod(beta_s_initial[[s]][, r] - matrix(c(hyperparameters$beta_prior, rep(0, ncol(x_s[[s]]) - 1)),
+                                                                                          nrow = ncol(x_s[[s]]),
+                                                                                          ncol = 1
+        )) + sum(diag(var_beta_s[[s]][[r]])))
       })
     })
 
