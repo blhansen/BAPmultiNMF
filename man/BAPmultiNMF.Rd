@@ -12,7 +12,7 @@ BAPmultiNMF(
   P_recover = NULL,
   recover_weights = 1e+08,
   tol = 1e-05,
-  min_iter = 10,
+  min_iter = 50,
   max_iter = 10000,
   verbose = TRUE
 )
@@ -40,7 +40,7 @@ BAPmultiNMF(
 
 \item{tol}{Convergence criteria. Default is 1e-5.}
 
-\item{min_iter}{Minimum number of CAVI iterations. Default is 10.}
+\item{min_iter}{Minimum number of CAVI iterations. Default is 50.}
 
 \item{max_iter}{Maximum number of CAVI iterations. Default is 1000.}
 

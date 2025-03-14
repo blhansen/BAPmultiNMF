@@ -20,7 +20,7 @@
 #' @param P_recover A matrix of dimensions \eqn{K \times R_{recover}}, containing previously known signatures to be recovered.
 #' @param recover_weights Either a single value or list of values of length \eqn{R_{recover}}, controlling the strength of the recovery prior. Higher values correspond to a more informative prior.
 #' @param tol Convergence criteria. Default is 1e-5.
-#' @param min_iter Minimum number of CAVI iterations. Default is 10.
+#' @param min_iter Minimum number of CAVI iterations. Default is 50.
 #' @param max_iter Maximum number of CAVI iterations. Default is 1000.
 #' @param verbose Logical value determining if the convergence criteria should be printed at each iteration. Default is TRUE.
 #'
@@ -60,7 +60,7 @@ BAPmultiNMF <- function(M_s,
                         P_recover = NULL,
                         recover_weights = 1e8,
                         tol = 1e-5,
-                        min_iter = 10,
+                        min_iter = 50,
                         max_iter = 1e4,
                         verbose = TRUE) {
   S <- length(M_s)
@@ -175,10 +175,21 @@ BAPmultiNMF <- function(M_s,
     R <- ncol(P_prior)
     P_initial <- sapply(1:R, function(r)
       rdirichlet(1, P_prior[, r]))
-    E_initial <- lapply(1:S, function(s)
-      t(rdirichlet(N_s[s], rep(
-        hyperparameters$e_conc, R
-      ))))
+
+
+    data_stacked <- do.call(cbind, M_s)
+    Eguess <- array(1, dim = c(ncol(P_initial), ncol(data_stacked)))
+    for (i in 1:1000) {
+      Eguess <- nmf_update.euclidean.h(
+        v = as.matrix(data_stacked),
+        w = as.matrix(P_initial),
+        h = Eguess
+      )
+    }
+
+    E_initial <- lapply(1:S, function(s, end) {
+      Eguess[, ifelse(s > 1, end[s - 1] + 1, 1):end[s]]
+    }, end = cumsum(N_s))
   }
 
   # Initialize latent sig counts
@@ -268,7 +279,6 @@ BAPmultiNMF <- function(M_s,
         var_xbeta <- c(t(as.matrix(x_s[[s]][j, ])) %*% (tau_s_initial[[s]][r]^-1 * diag(ncol(x_s[[s]]))) %*% as.matrix(x_s[[s]][j, ]))
 
         exp_term <- exp((a * mean_xbeta^3 + b * mean_xbeta))
-        #if(is.infinite(exp_term)){exp_term  <- ifelse(sign(mean_xbeta)==1, 0,1e6)}
         probit_1 <- log((1 + exp_term)^-1) - 1 / 2 * var_xbeta * (exp_term * (
           3 * a * mean_xbeta * (2 * exp_term + 3 * a * mean_xbeta^3 + 2) + 6 * a * b * mean_xbeta^2 + b^2
         )) / (exp_term + 1)^2
