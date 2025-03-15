@@ -142,10 +142,18 @@ BAPmultiNMF <- function(M_s,
     ), rep(10, K))), t(rdirichlet(floor((R - R_selected) / 2
     ), rep(0.01, K))))
 
-    E_initial <- lapply(1:S, function(s)
-      t(rdirichlet(N_s[s], rep(
-        hyperparameters$e_conc, R
-      ))))
+    Eguess <- array(1, dim = c(ncol(P_initial), ncol(data_stacked)))
+    for (i in 1:1000) {
+      Eguess <- nmf_update.euclidean.h(
+        v = as.matrix(data_stacked),
+        w = as.matrix(P_initial),
+        h = Eguess
+      )
+    }
+
+    E_initial <- lapply(1:S, function(s, end) {
+      Eguess[, ifelse(s > 1, end[s - 1] + 1, 1):end[s]]
+    }, end = cumsum(N_s))
     P_prior <- matrix(rep(hyperparameters$alpha_p, R),
                       nrow = K,
                       ncol = R)
@@ -170,18 +178,10 @@ BAPmultiNMF <- function(M_s,
 
 
     data_stacked <- do.call(cbind, M_s)
-    Eguess <- array(1, dim = c(ncol(P_initial), ncol(data_stacked)))
-    for (i in 1:1000) {
-      Eguess <- nmf_update.euclidean.h(
-        v = as.matrix(data_stacked),
-        w = as.matrix(P_initial),
-        h = Eguess
-      )
-    }
-
-    E_initial <- lapply(1:S, function(s, end) {
-      Eguess[, ifelse(s > 1, end[s - 1] + 1, 1):end[s]]
-    }, end = cumsum(N_s))
+    E_initial <- lapply(1:S, function(s)
+      t(rdirichlet(N_s[s], rep(
+        hyperparameters$e_conc, R
+      ))))
   }
 
   # Initialize latent sig counts
