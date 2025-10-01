@@ -267,17 +267,12 @@ BAPmultiNMF <- function(M_s,
         a <- 0.07056
         b <- 1.5976
 
-        mean_xbeta <- -c(matrix(x_s[[s]][j, ], nrow = 1) %*% beta_s_initial[[s]][, r])
+        mean_xbeta <- c(matrix(x_s[[s]][j, ], nrow = 1) %*% beta_s_initial[[s]][, r])
         var_xbeta <- c(t(as.matrix(x_s[[s]][j, ])) %*% (tau_s_initial[[s]][r]^-1 * diag(ncol(x_s[[s]]))) %*% as.matrix(x_s[[s]][j, ]))
 
-        exp_term <- exp((a * mean_xbeta^3 + b * mean_xbeta))
-        probit_1 <- log((1 + exp_term)^-1) - 1 / 2 * var_xbeta * (exp_term * (
-          3 * a * mean_xbeta * (2 * exp_term + 3 * a * mean_xbeta^3 + 2) + 6 * a * b * mean_xbeta^2 + b^2
-        )) / (exp_term + 1)^2
-        probit_0 <- log(1 - (1 + exp_term)^-1) - 1 / 2 * var_xbeta * (b^2 * exp_term + 3 *
-                                                                        a * mean_xbeta * ((3 * a * mean_xbeta^3 - 2) * exp_term - 2) + 6 * a * b *
-                                                                        mean_xbeta^2 * exp_term) / (exp_term + 1)^2
+        probit_0 <- log(pnorm(-mean_xbeta)) + (1/2) * var_xbeta * (pnorm(-mean_xbeta)*(-mean_xbeta/sqrt(2*pi)*exp(-(mean_xbeta)^2/2)) - dnorm(-mean_xbeta)^2)/pnorm(-mean_xbeta)^2
 
+        probit_1 <- log(1-pnorm(-mean_xbeta)) + (1/2) * var_xbeta * ( (1-pnorm(-mean_xbeta))*(-mean_xbeta/sqrt(2*pi)*exp(-(mean_xbeta)^2/2))-dnorm(-mean_xbeta)^2)/(1-pnorm(-mean_xbeta))^2
 
         log_ratio <- (rho_1 + probit_1) - (rho_0  + probit_0)
 
@@ -361,25 +356,21 @@ BAPmultiNMF <- function(M_s,
     if (iter > max_iter)
       break
 
-    z_prob <- lapply(1:S, function(s) {
-      array(sapply(1:N_s[s], function(j) {
-        sapply(1:K, function(i) {
-          probs <- sapply(1:R, function(r) digamma(p_conc[i,r]+1e-10)-digamma(sum(p_conc[,r]+1e-10))+digamma(e_conc[[s]][r,j]+1e-10)-digamma(sum(e_conc[[s]][,j]+1e-10)))
-          probs <- exp(probs)
-          probs <- probs / sum(probs)
-          return(as.array(probs))
-        })
-      }, simplify = "array"),
-      dim = c(R, K, N_s[s]))
+    z_prob <- lapply(1:S, function(s){
+      p_mat <- digamma(p_conc+1e-10)-t(replicate(K, digamma(apply(p_conc, 2, sum)+1e-10)))
+      e_mat <- digamma(e_conc[[s]]+1e-10)+t(replicate(R, digamma(apply(e_conc[[s]], 2, sum)+1e-10)))
+      out <- exp(replicate(N_s[s], p_mat) + aperm(replicate(K, e_mat), c(3,1,2)))
+      out <- sweep(out, c(1,3), apply(out, c(1,3), sum), "/")
+      return(out)
     })
-    z_prob <- lapply(1:S, function(s)
-      aperm(z_prob[[s]], c(2, 1, 3)))
 
     p_conc <- sapply(1:R, function(r) {
-      P_prior[, r] + rowSums(sapply(1:S, function(s)
-        apply(M_s[[s]] * z_prob[[s]][, r, ], 1, sum)))
+      P_prior[, r] + apply(
+        sapply(1:S, function(s)apply(M_s[[s]] * z_prob[[s]][, r, ], 1, sum)), 1, sum
+      )
     })
-    p_mean <- p_conc %*% diag(1 / colSums(p_conc))
+
+    p_mean <- sweep(p_conc, 2, apply(p_conc, 2, sum), "/")
 
     e_conc <- lapply(1:S, function(s) {
       sapply(1:N_s[s], function(j) {
@@ -419,17 +410,13 @@ BAPmultiNMF <- function(M_s,
           a <- 0.07056
           b <- 1.5976
 
-          mean_xbeta <- -c(t(x_s[[s]][j, ]) %*% mean_beta_s[[s]][[r]])
+          mean_xbeta <- c(t(x_s[[s]][j, ]) %*% mean_beta_s[[s]][[r]])
           var_xbeta <- c(t(x_s[[s]][j, ]) %*% (var_beta_s[[s]][[r]]) %*% x_s[[s]][j, ])
 
-          exp_term <- exp(a * mean_xbeta^3 + b * mean_xbeta)
-          probit_1 <- log((1 + exp_term)^-1) - 1 / 2 * var_xbeta * (exp_term * (
-            3 * a * mean_xbeta * (2 * exp_term + 3 * a * mean_xbeta^3 + 2) + 6 * a * b * mean_xbeta^2 + b^2
-          )) / (exp_term + 1)^2
-          probit_0 <- log(1 - (1 + exp_term)^-1) - 1 / 2 * var_xbeta * (
-            b^2 * exp_term + 3 * a * mean_xbeta * ((3 * a * mean_xbeta^3 - 2) * exp_term - 2) + 6 *
-              a * b * mean_xbeta^2 * exp_term
-          ) / (exp_term + 1)^2
+          probit_0 <- log(pnorm(-mean_xbeta)) + (1/2) * var_xbeta * (pnorm(-mean_xbeta)*(-mean_xbeta/sqrt(2*pi)*exp(-(mean_xbeta)^2/2)) - dnorm(-mean_xbeta)^2)/pnorm(-mean_xbeta)^2
+
+          probit_1 <- log(1-pnorm(-mean_xbeta)) + (1/2) * var_xbeta * ( (1-pnorm(-mean_xbeta))*(-mean_xbeta/sqrt(2*pi)*exp(-(mean_xbeta)^2/2))-dnorm(-mean_xbeta)^2)/(1-pnorm(-mean_xbeta))^2
+
 
           log_ratio <- (rho_1 + probit_1) - (rho_0  + probit_0)
 
@@ -450,10 +437,8 @@ BAPmultiNMF <- function(M_s,
         sapply(1:R, function(r) {
           mean_xbeta <- c(x_s[[s]][j, ] %*% mean_beta_s[[s]][[r]])
 
-          pos_expect <- mean_xbeta + dnorm(-mean_xbeta) / (1 - pnorm(-mean_xbeta) +
-                                                             1e-5)
-          neg_expect <- mean_xbeta - dnorm(-mean_xbeta) / (pnorm(-mean_xbeta) +
-                                                             1e-5)
+          pos_expect <- mean_xbeta + dnorm(-mean_xbeta) / (1 - pnorm(-mean_xbeta) + 1e-5)
+          neg_expect <- mean_xbeta - dnorm(-mean_xbeta) / (pnorm(-mean_xbeta) + 1e-5)
 
           if (is.infinite(pos_expect) | is.nan(pos_expect)) {
             if ((1 - pnorm(-mean_xbeta)) == 0) {
@@ -480,8 +465,9 @@ BAPmultiNMF <- function(M_s,
       sapply(1:R, function(r) {
         hyperparameters$tau_s_rate + 1 / 2 * (crossprod(beta_s_initial[[s]][, r] - matrix(c(hyperparameters$beta_prior, rep(0, ncol(x_s[[s]]) - 1)),
                                                                                           nrow = ncol(x_s[[s]]),
-                                                                                          ncol = 1
-        )) + sum(diag(var_beta_s[[s]][[r]])))
+                                                                                          ncol = 1)
+        ) + sum(diag(var_beta_s[[s]][[r]]))
+        )
       })
     })
 
