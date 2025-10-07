@@ -372,64 +372,48 @@ BAPmultiNMF <- function(M_s,
 
     p_mean <- sweep(p_conc, 2, apply(p_conc, 2, sum), "/")
 
-    e_conc <- lapply(1:S, function(s) {
-      sapply(1:N_s[s], function(j) {
-        e_conc_inc <- hyperparameters$e_conc
-        e_conc_null <- hyperparameters$e_conc_null
-        e_conc_inc * inc_probs[[s]][, j] + e_conc_null * (1 - inc_probs[[s]][, j]) + apply(diag(M_s[[s]][, j]) %*% z_prob[[s]][, , j], 2, sum)
-      })
+    e_conc <- lapply(1:S, function(s){
+      hyperparameters$e_conc * inc_probs[[s]] +
+        hyperparameters$e_conc_null * (1 - inc_probs[[s]]) +
+        apply(aperm(replicate(R, M_s[[s]]), c(1,3,2)) * z_prob[[s]], c(2,3), sum)
     })
-    e_mean <- lapply(1:S, function(s)
-      e_conc[[s]] %*% diag(1 / colSums(e_conc[[s]])))
 
-    inc_probs <- lapply(1:S, function(s) {
-      sapply(1:N_s[s], function(j) {
-        sapply(1:R, function(r) {
-          e_conc_inc <- hyperparameters$e_conc
-          e_conc_null <- hyperparameters$e_conc_null
-          e_alpha_0 = e_conc_inc * inc_probs[[s]][, j] + e_conc_null * (1 -
-                                                                          inc_probs[[s]][, j])
-          e_alpha_0 = sum(e_alpha_0[-r])
-          v_alpha_0 = (e_conc_inc - e_conc_null)^2 * (inc_probs[[s]][, j]) *
-            (1 - inc_probs[[s]][, j])
-          v_alpha_0 = sum(v_alpha_0[-r])
+    e_mean <- lapply(e_conc, function(mat) sweep(mat + 1e-10, 2, apply(mat, 2, sum), "/") )
 
-          e_alpha_0_inc = e_alpha_0 + e_conc_inc
-          e_alpha_0_null = e_alpha_0 + e_conc_null
+    inc_probs <- lapply(1:S, function(s){
+      conc_mat_mr <- t(replicate(R, apply(hyperparameters$e_conc * inc_probs[[s]] + hyperparameters$e_conc_null * (1-inc_probs[[s]]), 2, sum))) - (hyperparameters$e_conc * inc_probs[[s]] + hyperparameters$e_conc_null * (1-inc_probs[[s]]))
+      v_mat_taylor <- (hyperparameters$e_conc - hyperparameters$e_conc_null)^2 * (t(replicate(R, apply(inc_probs[[s]] * (1 - inc_probs[[s]]), 2, sum))) - inc_probs[[s]] * (1 - inc_probs[[s]]))
 
-          expect_beta_rel <- function(e, v)
-            lgamma(e) + 1 / 2 * psigamma(e, deriv = 1) * v
-          expect_log_exposure = digamma(e_conc[[s]][r, j]) - digamma(sum(e_conc[[s]][, j]))
+      beta_s_mat <- do.call(cbind, mean_beta_s[[s]])
+      var_beta_array <- array(unlist(var_beta_s[[1]]), dim = c(ncol(x_s[[s]]), ncol(x_s[[s]]), R))
 
+      xvbx <- sapply(1:R, function(r) apply((x_s[[s]] %*% var_beta_array[,,r]) * x_s[[s]], 1, sum))
 
-          rho_1 <- -lgamma(e_conc_inc) + expect_beta_rel(e_alpha_0_inc, v_alpha_0) +
-            (e_conc_inc - 1) * expect_log_exposure
-          rho_0 <- -lgamma(e_conc_null) + expect_beta_rel(e_alpha_0_null, v_alpha_0) +
-            (e_conc_null - 1) * expect_log_exposure
+      mean_xbeta_mat <- x_s[[s]] %*% beta_s_mat
 
-          a <- 0.07056
-          b <- 1.5976
+      prob_pos_mat <- 1 - pnorm(-mean_xbeta_mat)
+      prob_neg_mat <- 1 - prob_pos_mat
 
-          mean_xbeta <- c(t(x_s[[s]][j, ]) %*% mean_beta_s[[s]][[r]])
-          var_xbeta <- c(t(x_s[[s]][j, ]) %*% (var_beta_s[[s]][[r]]) %*% x_s[[s]][j, ])
+      prior_1 <- lgamma(hyperparameters$e_conc +  conc_mat_mr) +
+        1/2 * psigamma(hyperparameters$e_conc + conc_mat_mr, deriv = 1) * v_mat_taylor -
+        lgamma(hyperparameters$e_conc) +
+        (hyperparameters$e_conc-1) * (digamma(e_conc[[s]]) - t(replicate(R, digamma(apply(e_conc[[s]], 2, sum)))))
 
-          probit_0 <- log(pnorm(-mean_xbeta)) + (1/2) * var_xbeta * (pnorm(-mean_xbeta)*(-mean_xbeta/sqrt(2*pi)*exp(-(mean_xbeta)^2/2)) - dnorm(-mean_xbeta)^2)/pnorm(-mean_xbeta)^2
+      prior_0 <- lgamma(hyperparameters$e_conc_null +  conc_mat_mr) +
+        1/2 * psigamma(hyperparameters$e_conc_null + conc_mat_mr, deriv = 1) * v_mat_taylor -
+        lgamma(hyperparameters$e_conc_null) +
+        (hyperparameters$e_conc_null-1) * (digamma(e_conc[[s]]) - t(replicate(R, digamma(apply(e_conc[[s]], 2, sum)))))
 
-          probit_1 <- log(1-pnorm(-mean_xbeta)) + (1/2) * var_xbeta * ( (1-pnorm(-mean_xbeta))*(-mean_xbeta/sqrt(2*pi)*exp(-(mean_xbeta)^2/2))-dnorm(-mean_xbeta)^2)/(1-pnorm(-mean_xbeta))^2
+      like_1 <- log(prob_pos_mat) + 1/2 * xvbx * (prob_pos_mat * -mean_xbeta_mat/(sqrt(2*pi))*exp(mean_xbeta_mat^2/2) - dnorm(mean_xbeta_mat)^2)/(prob_pos_mat)^2
 
+      like_0 <- log(prob_neg_mat) + 1/2 * xvbx * (prob_neg_mat * -mean_xbeta_mat/(sqrt(2*pi))*exp(mean_xbeta_mat^2/2) - dnorm(mean_xbeta_mat)^2)/(prob_neg_mat)^2
 
-          log_ratio <- (rho_1 + probit_1) - (rho_0  + probit_0)
+      log_ratio <- (t(like_1) + prior_1) - (t(like_0) + prior_0)
 
-          if (is.infinite(log_ratio)) {
-            log_ratio <- sign(log_ratio) * 1e3
-          } else if (is.nan(log_ratio)){
-            log_ratio <- sign(-mean_xbeta) * 1e3
-          }
+      log_ratio[is.infinite(log_ratio)] <- sign(log_ratio[is.infinite(log_ratio)])*1e3
+      log_ratio[is.nan(log_ratio)] <- sign(t(mean_xbeta_mat)[is.nan(log_ratio)])*1e3
 
-
-          1 / (1 + exp(-log_ratio))
-        })
-      })
+      (1 + exp(-log_ratio))^(-1)
     })
 
     a_star <- lapply(1:S, function(s) {
